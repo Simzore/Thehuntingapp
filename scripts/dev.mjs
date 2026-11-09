@@ -1,3 +1,4 @@
+import { handleMaps } from '../server/maps.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
@@ -8,6 +9,12 @@ createServer(async (req, res) => {
   try {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405); res.end(); return;
+    }
+    const requestUrl = new URL(req.url, 'http://localhost:3000');
+    if (requestUrl.pathname.startsWith('/api/maps/')) {
+      const response = await handleMaps(new Request(requestUrl, { method: req.method }), process.env);
+      res.writeHead(response.status, Object.fromEntries(response.headers));
+      res.end(Buffer.from(await response.arrayBuffer())); return;
     }
     const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (path !== '/' && !/^\/(index\.html|src\/(app\.js|styles\.css))$/.test(path)) {

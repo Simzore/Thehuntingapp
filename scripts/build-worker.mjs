@@ -1,0 +1,21 @@
+import { readFile, mkdir, writeFile, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
+const files = { '/': ['index.html','text/html'], '/src/app.js': ['src/app.js','text/javascript'], '/src/styles.css': ['src/styles.css','text/css'] };
+const assets = {};
+for (const [path, [file,type]] of Object.entries(files)) assets[path] = {body: await readFile(file,'utf8'),type};
+const maps = await readFile('server/maps.mjs','utf8');
+const worker = maps + '\nconst assets = ' + JSON.stringify(assets) + `;
+export default { async fetch(request, env) {
+  const path = new URL(request.url).pathname;
+  if (path.startsWith('/api/maps/')) return handleMaps(request, env);
+  if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed',{status:405});
+  const asset = assets[path === '/index.html' ? '/' : path];
+  if (!asset) return new Response('Not found',{status:404});
+  return new Response(request.method === 'HEAD' ? null : asset.body,{headers:{'Content-Type':asset.type+'; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
+}};
+`;
+await rm('dist', {recursive:true,force:true});
+await mkdir('dist/server',{recursive:true});
+await writeFile('dist/server/index.js',worker);
+console.log('Worker built: dist/server/index.js (requires private hosting or upstream authentication)');
